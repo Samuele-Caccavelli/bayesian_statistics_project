@@ -2,7 +2,7 @@ import numpy as np
 import random
 import copy
 from tqdm import tqdm
-
+import pickle
 
 def cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alpha):
     """
@@ -91,3 +91,30 @@ def algorithm_3(n_steps, Y, integral_func_1, integral_func_2, alpha=1):
 
     return history
 
+def save_data(file_path, data, labels, MCMC_history, parameters):
+    """
+    Saves data, labels, output, and parameters to a file.
+
+    Args:
+        file_path (str): Path to the file where data will be stored.
+        data (numpy.ndarray): Array of shape (n_samples, n_dimensions).
+        labels (numpy.ndarray): Array of shape (n_samples).
+        output (numpy.ndarray): Matrix of size (n_samples, n_samples).
+        parameters (dict): Dictionary of parameters.
+    """
+    with open(file_path, 'wb') as file:
+        pickle.dump({'data': data, 'labels': labels, 'MCMC_history': MCMC_history, 'parameters': parameters}, file)
+
+def load_data(file_path):
+    """
+    Loads data, labels, output, and parameters from a file.
+
+    Args:
+        file_path (str): Path to the file to load data from.
+
+    Returns:
+        tuple: A tuple containing data, labels, output, and parameters.
+    """
+    with open(file_path, 'rb') as file:
+        stored_data = pickle.load(file)
+    return stored_data['data'], stored_data['labels'], stored_data['MCMC_history'], stored_data['parameters']

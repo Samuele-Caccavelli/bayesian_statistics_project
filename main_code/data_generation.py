@@ -12,19 +12,20 @@ def generate_gaussian_mixture(means, covariances, n_samples):
 
     Returns:
         data (numpy.ndarray): Array of generated data points.
-        labels (numpy.ndarray): Array of labels indicating the Gaussian each point belongs to.
+        labels (list of lists): Cluster belonging information.
     """
     data = []
     labels = []
 
+    start_idx = 0
     for i, (mean, cov, n) in enumerate(zip(means, covariances, n_samples)):
         points = np.random.multivariate_normal(mean, cov, n)
         data.append(points)
-        labels.extend([i] * n)
+        cluster_indices = list(range(start_idx, start_idx + n))
+        labels.append(cluster_indices)
+        start_idx += n
 
     data = np.vstack(data)
-    labels = np.array(labels)
-
     return data, labels
 
 

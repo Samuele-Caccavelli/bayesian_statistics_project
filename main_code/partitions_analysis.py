@@ -149,3 +149,33 @@ def clusters_from_matrix(S, loss=binder_loss_label_format, max_clusters=None):
 
     return best_clustering, best_n_clusters, scores[1:]
 
+def find_optimal_clustering_binder_loss(mcmc_clusterings, S, alpha=1.0, beta=1.0):
+    """
+    Find the clustering that minimizes the Binder loss.
+
+    Parameters:
+    - mcmc_clusterings: list of lists of lists
+        Each entry is a clustering (list of lists format).
+    - S: array-like, shape (N, N)
+        Posterior similarity matrix.
+    - alpha: float
+        Weight for within-cluster disagreements.
+    - beta: float
+        Weight for between-cluster disagreements.
+
+    Returns:
+    - optimal_clustering: list of lists
+        The clustering that minimizes the Binder loss.
+    - optimal_loss: float
+        The Binder loss of the optimal clustering.
+    """
+    min_loss = float('inf')
+    optimal_clustering = None
+
+    for clustering in mcmc_clusterings:
+        loss = binder_loss_list_format(clustering, S, alpha, beta)
+        if loss < min_loss:
+            min_loss = loss
+            optimal_clustering = clustering
+    
+        return optimal_clustering, min_loss

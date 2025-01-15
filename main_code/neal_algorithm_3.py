@@ -4,6 +4,8 @@ import copy
 from tqdm import tqdm
 import pickle
 import matplotlib.pyplot as plt
+from scipy.spatial.distance import mahalanobis
+
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath('../../main_code')))
 from main_code.partitions_analysis import compute_entropy
@@ -20,7 +22,32 @@ def compute_inv_scale_mat_0(D):
 def compute_lamb_0(Y):
     return 1    # default to 1
 
-def cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alpha, mu_0, lamb_0, nu_0, inv_scale_mat_0):
+def compute_mahalanobis_penalty(X, cluster, new_obs, cov_matrix):
+    """
+    Computes the Mahalanobis distance penalty for a cluster.
+
+    Args:
+        X: 2D array of covariates.
+        cluster: list of indices, representing the current cluster.
+        new_obs: int, index of the new observation.
+        cov_matrix: 2D array, covariance matrix of the cluster.
+
+    Returns:
+        penalty: float, Mahalanobis distance penalty for the cluster.
+    """
+    if len(cluster) == 0:
+        return 0  # No penalty for empty clusters
+    
+    # Combine current cluster observations and the new observation
+    cluster_data = np.array([X[idx] for idx in cluster] + [X[new_obs]])
+    cluster_mean = np.mean(cluster_data, axis=0)
+    
+    # Compute Mahalanobis distance for the new observation
+    penalty = mahalanobis(X[new_obs], cluster_mean, np.linalg.inv(cov_matrix))
+    return penalty
+
+def cluster_probabilities(i, clusters, Y, X, integral_func_1, integral_func_2, alpha,
+                          mu_0, lamb_0, nu_0, inv_scale_mat_0, lambda_penalty):
     """
     Computes the probabilities of observation i joining each clusters or creating a new one. The output is not sctictly probabilities but weights.
     
@@ -28,10 +55,12 @@ def cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alph
         i: int, index of the observation to add to the clustering
         clusters: list of list, current partition
         Y: 2D array, of observations. Each observation is a vetor of size D. So Y is of shape (n_observation, D)
+        X: 2D array, covariate data for penalty computation.
         integral_func_1: function to compute the first integral in (3.7). Takes as argument the current observations in a cluster and the new observation.
         integral_func_2: function to compute the second integral in (3.7). Takes as argument the only observation of the new cluster
         alpha: float, concentration parameter. alpha > 0
         mu_0, lamb_0, nu_0, inv_scale_mat_0: prior parameters
+        lambda_penalty: float, weight for Mahalanobis penalty.
     Returns:
         probabilities array, probabilities[j] = probability of joining cluster j. probabilities[-1] = probability of creating a new cluster
     """
@@ -39,10 +68,17 @@ def cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alph
     n_clusters = len(clusters)
     probabilities = np.zeros(n_clusters+1)
 
+    # Compute covariance matrix for Mahalanobis penalty on X
+    cov_matrix_X = np.cov(X.T)
+
     # probabilities of joining existing cluster
     for c in range(n_clusters):
         probabilities[c] = integral_func_1(Y, clusters[c], i, mu_0, lamb_0, nu_0, inv_scale_mat_0)
         probabilities[c] *= (len(clusters[c]) / (n - 1 + alpha))
+
+        # Apply Mahalanobis penalty based on X
+        penalty = compute_mahalanobis_penalty(X, clusters[c], i, cov_matrix_X)
+        probabilities[c] *= np.exp(-lambda_penalty * penalty)
 
     # probability of creating new cluster
     probabilities[-1] = integral_func_2(Y, i, mu_0, lamb_0, nu_0, inv_scale_mat_0)
@@ -51,7 +87,9 @@ def cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alph
     return probabilities
 
 
-def algorithm_3(n_steps, Y, integral_func_1, integral_func_2, alpha=1, compute_mu_0=compute_mu_0, compute_lamb_0=compute_lamb_0, compute_nu_0=compute_nu_0, compute_inv_scale_mat_0=compute_inv_scale_mat_0, visualize_entropy=True):
+def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda_penalty=0.1,
+                compute_mu_0=compute_mu_0, compute_lamb_0=compute_lamb_0, compute_nu_0=compute_nu_0, compute_inv_scale_mat_0=compute_inv_scale_mat_0,
+                visualize_entropy=True):
     """
     Performs a markov chain using algorithm 3 from Neal (2000). 
 
@@ -96,7 +134,8 @@ def algorithm_3(n_steps, Y, integral_func_1, integral_func_2, alpha=1, compute_m
                 clusters[c].remove(i)
 
             # 3. Compute probabilities of adding i to each cluster
-            weights = cluster_probabilities(i, clusters, Y, integral_func_1, integral_func_2, alpha, mu_0, lamb_0, nu_0, inv_scale_mat_0)
+            weights = cluster_probabilities(i, clusters, Y, X, integral_func_1, integral_func_2, alpha,
+                                            mu_0, lamb_0, nu_0, inv_scale_mat_0, lambda_penalty)
             transitions = list(range(len(weights)))
             transition = random.choices(transitions, weights=weights)[0]
 

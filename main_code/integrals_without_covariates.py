@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.stats import multivariate_t
 
+# The computation of the integral is obtained from Murphy (2007) 
+# (https://www.cs.ubc.ca/~murphyk/Papers/bayesGauss.pdf).
+
 def integral_func_1(Y, cluster, i, mu_0, lamb_0, nu_0, inv_scale_mat_0):
     """
     Compute the first integral using student_t distribution based on Murphy (2007) parameters

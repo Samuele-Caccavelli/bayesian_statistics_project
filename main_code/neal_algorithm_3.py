@@ -89,7 +89,7 @@ def cluster_probabilities(i, clusters, Y, X, integral_func_1, integral_func_2, a
 
 def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda_penalty=0.1,
                 compute_mu_0=compute_mu_0, compute_lamb_0=compute_lamb_0, compute_nu_0=compute_nu_0, compute_inv_scale_mat_0=compute_inv_scale_mat_0,
-                visualize_entropy=True):
+                visualize_entropy=True, folder_path="../../results", file_name=None):
     """
     Performs a markov chain using algorithm 3 from Neal (2000). 
 
@@ -101,6 +101,8 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
         alpha: float, concentration parameter. alpha > 0
         compute_mu_0, compute_lamb_0, compute_nu_0, compute_inv_scale_mat_0: function to define prior assumptions
         visualize_entropy: boolean, to control if the entropy has to be shown at the end of the algorithm
+        folder_path: str, folder path where results will be saved. Default works with our path layout
+        file_name: str, name of the file (with extension) to save the results
     """
     D = len(Y[0])
     n_obs = len(Y)
@@ -114,7 +116,12 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
     clusters = [[i] for i in range(n_obs)]
 
     history = [copy.deepcopy(clusters)]
-    entropies = [compute_entropy(clusters)]
+
+    # Compute entropy for the traceplot
+    # entropies = [compute_entropy(clusters)]
+    #! in the following way the entropy of the starting point (each point in their own cluster) is set to 0 
+    #! so that we can more properly see the trace-plots without a huge value at the start
+    entropies = [0] 
 
     # Initialize progress bar
     progress_bar = tqdm(total=n_steps, desc="Markov Chain Progress", unit="step")
@@ -155,13 +162,21 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
     # Close progress bar
     progress_bar.close()
 
-    if visualize_entropy == True:
+    if visualize_entropy:
             plt.plot(entropies)
             plt.title("Traceplot")
             plt.xlabel("Iteration")
             plt.ylabel("Entropy")
-    
-    return history, entropies
+
+    # Save results to the specified file if both folder_path and file_name are provided
+    if folder_path and file_name:
+        full_path = os.path.join(folder_path, file_name)
+        os.makedirs(folder_path, exist_ok=True)  # Create folder if it doesn't exist
+        with open(full_path, "wb") as f:
+            pickle.dump({"history": history, "entropies": entropies}, f)
+        print(f"Results saved to {full_path}")
+
+    return {"history": history, "entropies": entropies, "save_path": full_path if folder_path and file_name else None}
 
 def save_data(file_path, data, labels, MCMC_history, parameters):
     """

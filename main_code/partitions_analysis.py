@@ -7,6 +7,7 @@ import random
 import copy
 from tqdm import tqdm
 from sklearn.cluster import AgglomerativeClustering
+from scipy.special import rel_entr
 
 def compute_entropy(labels, base=None, label_format="list"):
     if label_format == "list":
@@ -16,9 +17,7 @@ def compute_entropy(labels, base=None, label_format="list"):
         return entropy(counts, base=base)
     if label_format == "array":
         _, counts = np.unique(labels, return_counts=True)
-        return entropy(counts, base=base)
-
-  
+        return entropy(counts, base=base)  
 
 def sampled_sim_matrix(MC_part, n_obs):
     """
@@ -52,7 +51,6 @@ def sampled_sim_matrix(MC_part, n_obs):
     np.fill_diagonal(A, 1.0)
 
     return A
-
 
 def binder_loss_label_format(labels, S, alpha=1.0, beta=1.0):
     """
@@ -104,8 +102,47 @@ def binder_loss_list_format(clustering, S, alpha=1.0, beta=1.0):
     for cluster_id, indices in enumerate(clustering):
         for index in indices:
             labels[index] = cluster_id
-    return binder_loss_label_format(labels, S)
+    return binder_loss_label_format(labels, S, alpha, beta)
 
+def variation_of_information_list_format(clustering, S):
+    """
+    Compute the Variation of Information (VI) loss for a clustering in list-of-lists format
+    and a similarity matrix.
+
+    Parameters:
+    - clustering: list of lists
+        Each sublist contains the indices of data points in the same cluster.
+    - S: array-like, shape (N, N)
+        Posterior similarity matrix (symmetric).
+
+    Returns:
+    - vi_loss: float
+        The Variation of Information (VI) loss value.
+    """
+    # Convert clustering to label format
+    N = S.shape[0]
+    labels = np.zeros(N, dtype=int)
+    for cluster_id, indices in enumerate(clustering):
+        for index in indices:
+            labels[index] = cluster_id
+
+    # Compute cluster probabilities (empirical distribution of the clustering)
+    cluster_sizes = np.array([len(cluster) for cluster in clustering])
+    cluster_probs = cluster_sizes / N
+
+    # Compute entropy of the clustering
+    H_C = -np.sum(cluster_probs * np.log(cluster_probs + 1e-10))  # Add a small value to avoid log(0)
+
+    # Compute mutual information between clustering and similarity matrix
+    MI = 0.0
+    for i in range(N):
+        for j in range(N):
+            if labels[i] == labels[j]:
+                MI += S[i, j] * np.log(S[i, j] / (cluster_probs[labels[i]] ** 2 + 1e-10) + 1e-10)
+
+    # Compute Variation of Information (VI) loss
+    vi_loss = 2 * H_C - 2 * MI
+    return vi_loss
 
 def clusters_from_matrix(S, loss=binder_loss_label_format, max_clusters=None):
     """
@@ -149,7 +186,7 @@ def clusters_from_matrix(S, loss=binder_loss_label_format, max_clusters=None):
 
     return best_clustering, best_n_clusters, scores[1:]
 
-def find_optimal_clustering_binder_loss(mcmc_clusterings, S, alpha=1.0, beta=1.0):
+def find_optimal_clustering(mcmc_clusterings, S, loss="binder", alpha=1.0, beta=1.0):
     """
     Find the clustering that minimizes the Binder loss.
 
@@ -158,6 +195,8 @@ def find_optimal_clustering_binder_loss(mcmc_clusterings, S, alpha=1.0, beta=1.0
         Each entry is a clustering (list of lists format).
     - S: array-like, shape (N, N)
         Posterior similarity matrix.
+    - loss: string
+        Choose type of loss to be minimize between Binder and Variation of Information
     - alpha: float
         Weight for within-cluster disagreements.
     - beta: float
@@ -172,10 +211,18 @@ def find_optimal_clustering_binder_loss(mcmc_clusterings, S, alpha=1.0, beta=1.0
     min_loss = float('inf')
     optimal_clustering = None
 
-    for clustering in mcmc_clusterings:
-        loss = binder_loss_list_format(clustering, S, alpha, beta)
-        if loss < min_loss:
-            min_loss = loss
-            optimal_clustering = clustering
+    if loss == "binder":
+        for clustering in mcmc_clusterings:
+            loss = binder_loss_list_format(clustering, S, alpha, beta)
+            if loss < min_loss:
+                min_loss = loss
+                optimal_clustering = clustering
+
+    if loss == "VI":
+        for clustering in mcmc_clusterings:
+            loss = variation_of_information_list_format(clustering, S)
+            if loss < min_loss:
+                min_loss = loss
+                optimal_clustering = clustering
     
-        return optimal_clustering, min_loss
+    return optimal_clustering, min_loss

@@ -14,13 +14,13 @@ class Neal_3:
     Class for Neal Algorithm 3
     """
 
-    def __init__(self):
+    def __init__(self, alpha=0.1, lamb_0=1):
         
         # Initialize attributes
 
         # These use default values that can be changed
-        self.alpha = 0.1
-        self.lamb_0 = 1
+        self.alpha = alpha
+        self.lamb_0 = lamb_0
 
         # These require data format to initialize
         self.Y = None
@@ -134,7 +134,7 @@ class Neal_3:
 
         return probabilities
 
-    def fit(self, Y, n_steps, metrics=None):
+    def fit(self, Y, n_steps, metrics=[]):
         """
         Performs a markov chain using algorithm 3 from Neal (2000).
         Main function of this class
@@ -215,8 +215,6 @@ class Neal_3:
         return
 
 
-
-
     # Post Processing functions :
     def compute_similarity_matrix(self):
         """
@@ -277,9 +275,9 @@ class PPMx(Neal_3):
         
         return probabilities
     
-    def fit(self, Y, X, n_steps, lambda_penalty=0.1):
+    def fit(self, Y, X, n_steps, lambda_penalty=0.1, metrics=[]):
 
         self.X = X
         self.lambda_penalty = lambda_penalty
-        return super().fit(Y, n_steps)
+        return super().fit(Y, n_steps, metrics=metrics)
     

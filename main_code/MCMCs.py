@@ -42,9 +42,11 @@ class Neal_3:
     # Model hyper-parameter Functions -- Can be changed to see what works best
     def compute_nu_0(self):
         """
-        Computes and set the value for nu_0 depending on the number of dimensions D
+        Computes and set the value for nu_0 depending on the number of dimensions D of Y
         """
-        # TODO Check if this initialization is correct
+        if self.D is None:
+            raise ValueError("No dimension D provided to compute nu_0")
+
         self.nu_0 = self.D + 3
     
     def compute_mu_0(self):
@@ -59,7 +61,7 @@ class Neal_3:
     def compute_inv_scale_mat_0(self):
         """
         Computes the inverse scale matrix hyper parameter for the NIW.
-        Defaults as the identity, might need to be changed (TODO)
+        Defaults as the identity, might need to be changed (TODO?)
         """
         self.inv_scale_mat_0 = np.eye(self.D)
 
@@ -142,8 +144,12 @@ class Neal_3:
         Args:
             Y: 2D array, of observations. Each observation is a vetor of size D. So Y is of shape (n_observation, D)
             n_steps: int, number of step of the markov chain to do (one step is defined as randomly moving each observation 1 time)
-            callback: list of fucntions to call at every step
+            metrics: list of strings, names of the metrics to compute at runtime (e.g. for the traceplots)
+        
+        Returns:
+            history, list of partitions
         """
+
         # Set basic attributes
         self.Y = Y
         self.n_obs = len(Y)
@@ -218,7 +224,12 @@ class Neal_3:
     # Post Processing functions :
     def compute_similarity_matrix(self):
         """
-        Computes the similarity matrix based on
+        Computes the similarity matrix based on the history of the MCMC.
+
+        Returns:
+            array (n_obs, n_obs), similarity matrix
+        
+        Raises RuntimeError if the model has not been fitted to data
         """
         if self.history is None:
             raise RuntimeError("No MCMC history to compute the similarity matrix")
@@ -238,8 +249,26 @@ class Neal_3:
 
         # Ensure the diagonal is 1 (observations are always in the same cluster with themselves)
         np.fill_diagonal(A, 1.0)
+
+        # Both save the matrix and return it
         self.similatity_matrix = A
         return A
+    
+    def save(self, file_path):
+        """
+        Save this object to a file given by file_path
+        """
+        with open(file_path, 'wb') as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, file_path):
+        """
+        Loads an object from file given by file_path
+        """
+        with open(file_path, 'rb') as file:
+            loaded_object = pickle.load(file)
+        return loaded_object
 
 
 class PPMx(Neal_3):

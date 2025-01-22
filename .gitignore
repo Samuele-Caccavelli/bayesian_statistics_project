@@ -1,1 +1,7 @@
 .DS_Store
+results/test/*
+notebooks/jupyter/test_clean_project.ipynb
+main_code/lib/plotlib.py
+main_code/file.py
+.gitignore
+data/dataset.h5

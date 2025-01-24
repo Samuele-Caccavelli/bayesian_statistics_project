@@ -222,9 +222,12 @@ class Neal_3:
 
 
     # Post Processing functions :
-    def compute_similarity_matrix(self):
+    def compute_similarity_matrix(self, burn_in=0):
         """
         Computes the similarity matrix based on the history of the MCMC.
+
+        Args:
+            burn_in: int, specify from which iteration of the chain compute the similarity matrix. Default to 0
 
         Returns:
             array (n_obs, n_obs), similarity matrix
@@ -236,13 +239,22 @@ class Neal_3:
         A = np.zeros((self.n_obs, self.n_obs), dtype=float)
         n_samples = len(self.history)
 
-        for clusters in self.history:
+        # Initialize progress bar
+        progress_bar = tqdm(total=len(self.history[burn_in:]), desc="Similarity Matrix Progress", unit="step")
+
+        for clusters in self.history[burn_in:]:
             for cluster in clusters:
                 for k, i in enumerate(cluster):
                     for j in cluster[k:]:
                         if i != j:  # Avoid double increment for diagonal
                             A[i, j] += 1
                             A[j, i] += 1
+
+            # Update progress bar
+            progress_bar.update(1)
+
+        # Close progress bar
+        progress_bar.close()
 
         # Normalize by the number of samples
         A /= n_samples
@@ -276,8 +288,8 @@ class PPMx(Neal_3):
     Extends Neal_3 class by including covariates
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, alpha=0.1, lamb_0=1):
+        super().__init__(alpha=alpha, lamb_0=lamb_0)
 
         # attributes specific to algorithm with covariates
         self.lambda_penalty = None

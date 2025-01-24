@@ -5,3 +5,4 @@ main_code/lib/plotlib.py
 main_code/file.py
 .gitignore
 data/dataset.h5
+*.mcmc

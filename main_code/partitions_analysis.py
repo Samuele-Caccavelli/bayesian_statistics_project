@@ -211,6 +211,9 @@ def find_optimal_clustering(mcmc_clusterings, S, loss="binder", alpha=1.0, beta=
     min_loss = float('inf')
     optimal_clustering = None
 
+    # Initialize progress bar
+    progress_bar = tqdm(total=len(mcmc_clusterings), desc="Point Estimate Progress", unit="step")
+
     if loss == "binder":
         for clustering in mcmc_clusterings:
             loss = binder_loss_list_format(clustering, S, alpha, beta)
@@ -218,11 +221,20 @@ def find_optimal_clustering(mcmc_clusterings, S, loss="binder", alpha=1.0, beta=
                 min_loss = loss
                 optimal_clustering = clustering
 
+            # Update progress bar
+            progress_bar.update(1)
+
     if loss == "VI":
         for clustering in mcmc_clusterings:
             loss = variation_of_information_list_format(clustering, S)
             if loss < min_loss:
                 min_loss = loss
                 optimal_clustering = clustering
+
+            # Update progress bar
+            progress_bar.update(1)
+
+    # Close progress bar
+    progress_bar.close()
     
     return optimal_clustering, min_loss

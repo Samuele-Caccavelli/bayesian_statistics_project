@@ -32,6 +32,10 @@ class Neal_3:
         # attributes for computed when fitting
         self.history = None
         self.similatity_matrix = None
+
+        # Saving the clustering computed via Binder loss minimization
+        self.optimal_clustering = None
+        self.optimal_loss = None
         
         self.metrics = {"entropy":[],
                         "binder loss":[],
@@ -265,6 +269,82 @@ class Neal_3:
         # Both save the matrix and return it
         self.similatity_matrix = A
         return A
+    
+    def binder_loss(self, clustering, alpha=1.0, beta=1.0):
+        """
+        Compute the Binder loss for a clustering in either labels format or list-of-lists format.
+
+        Parameters:
+        - clustering: array-like or list of lists
+            If array-like, clustering[i] is the cluster label of observation i.
+            If list of lists, each sublist contains the indices of data points in the same cluster.
+        - alpha: float
+            Weight for within-cluster disagreements.
+        - beta: float
+            Weight for between-cluster disagreements.
+
+        Returns:
+        - loss: float
+            The Binder loss value.
+        """
+        # If clustering is in list-of-lists format, convert to label format
+        if isinstance(clustering, list):
+            N = self.similatity_matrix.shape[0]
+            labels = np.zeros(N, dtype=int)
+            for cluster_id, indices in enumerate(clustering):
+                for index in indices:
+                    labels[index] = cluster_id
+        else:
+            labels = np.array(clustering)
+        
+        # Compute the Binder loss
+        loss = 0.0
+        N = self.similatity_matrix.shape[0]
+        for i in range(N):
+            for j in range(i + 1, N):
+                same_cluster = labels[i] == labels[j]
+                loss += alpha * same_cluster * (1 - self.similatity_matrix[i, j]) + beta * (not same_cluster) * self.similatity_matrix[i, j]
+        return loss
+    
+    def find_optimal_clustering(self, alpha=1.0, beta=1.0):
+        """
+        Find the clustering that minimizes the Binder loss.
+
+        Parameters:
+        - alpha: float
+            Weight for within-cluster disagreements.
+        - beta: float
+            Weight for between-cluster disagreements.
+
+        Returns:
+        - optimal_clustering: list of lists
+            The clustering that minimizes the Binder loss.
+        - optimal_loss: float
+            The Binder loss of the optimal clustering.
+        """
+
+        if self.similatity_matrix is None:
+            raise ValueError("Similarity matrix not yet computed")
+        
+        # Set a very big number to initialize the loss
+        self.optimal_loss = 1e9
+
+        # Initialize progress bar
+        progress_bar = tqdm(total=len(self.history), desc="Point Estimate Progress", unit="step")
+
+        for clustering in self.history:
+            loss = self.binder_loss(clustering, alpha, beta)
+            if loss < self.optimal_loss:
+                self.optimal_loss = loss
+                self.optimal_clustering = clustering
+
+            # Update progress bar
+            progress_bar.update(1)
+
+        # Close progress bar
+        progress_bar.close()
+        
+        return self.optimal_clustering, self.optimal_loss
     
     def save(self, file_path):
         """

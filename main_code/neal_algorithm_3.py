@@ -5,6 +5,7 @@ from tqdm import tqdm
 import pickle
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import mahalanobis
+from sklearn.cluster import KMeans
 
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath('../../main_code')))
@@ -86,6 +87,51 @@ def cluster_probabilities(i, clusters, Y, X, integral_func_1, integral_func_2, a
 
     return probabilities
 
+def compute_summary_statistics(clustering, X):
+    """
+    Compute the mean of each cluster based on the provided clustering and covariates.
+    
+    Parameters:
+        clustering (list of lists): A list where each sublist contains the indices of data points in a cluster.
+        X (numpy.ndarray): A 2D array (n_samples, n_features) representing the covariates of the data.
+        
+    Returns:
+        numpy.ndarray: A 2D array (n_clusters, n_features) containing the mean of each cluster.
+    """
+    cluster_means = []
+    for cluster in clustering:
+        if len(cluster) > 0:  # Avoid empty clusters
+            cluster_points = X[cluster]  # Select points in the cluster
+            cluster_mean = np.mean(cluster_points, axis=0)  # Compute the mean along features
+            cluster_means.append(cluster_mean)
+        else:
+            cluster_means.append(np.zeros(X.shape[1]))  # Placeholder for empty clusters (all-zero vector)
+    
+    return np.array(cluster_means)
+
+def cluster_summary_statistics(summary_statistics, n_clusters):
+    """
+    Perform clustering on the summary statistics of Layer 1 clusters.
+    
+    Parameters:
+        summary_statistics (numpy.ndarray): A 2D array (n_clusters_layer1, n_features) 
+                                             containing the mean of each cluster from Layer 1.
+        n_clusters (int): The number of higher-level clusters to form.
+        
+    Returns:
+        list of lists: A list where each sublist contains the indices of Layer 1 clusters
+                       grouped into the same higher-level cluster.
+    """
+    # Perform clustering on the summary statistics
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    labels = kmeans.fit_predict(summary_statistics)
+    
+    # Group indices of Layer 1 clusters by their assigned higher-level cluster
+    grouped_clusters = [[] for _ in range(n_clusters)]
+    for cluster_idx, label in enumerate(labels):
+        grouped_clusters[label].append(cluster_idx)
+    
+    return grouped_clusters
 
 def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda_penalty=0.1,
                 compute_mu_0=compute_mu_0, compute_lamb_0=compute_lamb_0, compute_nu_0=compute_nu_0, compute_inv_scale_mat_0=compute_inv_scale_mat_0,
@@ -115,7 +161,9 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
 
     clusters = [[i] for i in range(n_obs)]
 
-    history = [copy.deepcopy(clusters)]
+    history_l1 = [copy.deepcopy(clusters)]
+    summary_statistics = compute_summary_statistics(history_l1[0], X)
+    history_l2 = [cluster_summary_statistics(summary_statistics, 2)]
 
     # Compute entropy for the traceplot
     # entropies = [compute_entropy(clusters)]
@@ -152,8 +200,12 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
             else:
                 clusters[transition].append(i)
 
+        # Apply second layer of clustering
+        summary_statistics = compute_summary_statistics(clusters, X)
+
         # All elements have moved once -> one step of the Markov chain
-        history.append(copy.deepcopy(clusters))
+        history_l1.append(copy.deepcopy(clusters))
+        history_l2.append(cluster_summary_statistics(summary_statistics, 2))
         entropies.append(compute_entropy(clusters))
 
         # Update progress bar
@@ -173,10 +225,10 @@ def algorithm_3(n_steps, Y, X, integral_func_1, integral_func_2, alpha=1, lambda
         full_path = os.path.join(folder_path, file_name)
         os.makedirs(folder_path, exist_ok=True)  # Create folder if it doesn't exist
         with open(full_path, "wb") as f:
-            pickle.dump({"history": history, "entropies": entropies}, f)
+            pickle.dump({"history": history_l1, "entropies": entropies}, f)
         print(f"Results saved to {full_path}")
 
-    return {"history": history, "entropies": entropies, "save_path": full_path if folder_path and file_name else None}
+    return {"history_l1": history_l1, "history_l2": history_l2,"entropies": entropies, "save_path": full_path if folder_path and file_name else None}
 
 def save_data(file_path, data, labels, MCMC_history, parameters):
     """

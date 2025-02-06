@@ -6,7 +6,7 @@ import random
 import copy
 from scipy.stats import multivariate_t
 from scipy.spatial.distance import mahalanobis
-from main_code.partitions_analysis import compute_entropy, sampled_sim_matrix
+from main_code.partitions_analysis import compute_entropy
 
 
 class Neal_3:

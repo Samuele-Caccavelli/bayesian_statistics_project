@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def generate_gaussian_mixture(means, covariances, n_samples):
     """
     Generate synthetic data from a mixture of Gaussians.

@@ -6,3 +6,6 @@ main_code/file.py
 .gitignore
 data/dataset.h5
 *.mcmc
+Markov sampling Crowley.ipynb
+neal_algorithm3.ipynb
+test_parameters.txt
